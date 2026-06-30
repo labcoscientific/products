@@ -1,0 +1,39 @@
+name: Export image list
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Create CSV
+        shell: bash
+        run: |
+          BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+
+          printf '"File Path","Filename","Image URL"\n' > github-images.csv
+
+          find products -type f \
+            \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" -o -iname "*.gif" \) \
+            | sort \
+            | while IFS= read -r file; do
+                filename="$(basename "$file")"
+                encoded_path="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$file")"
+
+                printf '"%s","%s","%s/%s"\n' \
+                  "$file" \
+                  "$filename" \
+                  "$BASE_URL" \
+                  "$encoded_path"
+              done >> github-images.csv
+
+      - name: Upload CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-image-list
+          path: github-images.csv
