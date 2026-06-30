@@ -1,0 +1,57 @@
+name: Export image list
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Create CSV
+        shell: bash
+        run: |
+          IMAGE_FOLDER="images"
+          BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+
+          if [ ! -d "$IMAGE_FOLDER" ]; then
+            echo "ERROR: The folder '$IMAGE_FOLDER' does not exist."
+            exit 1
+          fi
+
+          printf '"File Path","Filename","Image URL"\n' > github-images.csv
+
+          find "$IMAGE_FOLDER" -type f \
+            \( -iname "*.jpg" -o \
+               -iname "*.jpeg" -o \
+               -iname "*.png" -o \
+               -iname "*.webp" -o \
+               -iname "*.gif" \) \
+            -print0 |
+          sort -z |
+          while IFS= read -r -d '' file; do
+            filename="$(basename "$file")"
+
+            encoded_path="$(python3 -c \
+              'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' \
+              "$file")"
+
+            printf '"%s","%s","%s/%s"\n' \
+              "$file" \
+              "$filename" \
+              "$BASE_URL" \
+              "$encoded_path"
+          done >> github-images.csv
+
+          echo "CSV created successfully:"
+          cat github-images.csv
+
+      - name: Upload CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-image-list
+          path: github-images.csv
+          if-no-files-found: error
