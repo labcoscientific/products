@@ -14,26 +14,49 @@ jobs:
       - name: Create CSV
         shell: bash
         run: |
+          IMAGE_FOLDER="products/images"
           BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+
+          echo "Looking for folder: $IMAGE_FOLDER"
+          echo "Repository contents:"
+          find . -maxdepth 3 -type d | sort
+
+          if [ ! -d "$IMAGE_FOLDER" ]; then
+            echo "ERROR: The folder '$IMAGE_FOLDER' does not exist."
+            echo "Check the exact spelling and capitalisation in your repository."
+            exit 1
+          fi
 
           printf '"File Path","Filename","Image URL"\n' > github-images.csv
 
-          find products/images -type f \
-            \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" -o -iname "*.gif" \) \
-            | sort \
-            | while IFS= read -r file; do
-                filename="$(basename "$file")"
-                encoded_path="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$file")"
+          find "$IMAGE_FOLDER" -type f \
+            \( -iname "*.jpg" -o \
+               -iname "*.jpeg" -o \
+               -iname "*.png" -o \
+               -iname "*.webp" -o \
+               -iname "*.gif" \) \
+            -print0 |
+          sort -z |
+          while IFS= read -r -d '' file; do
+            filename="$(basename "$file")"
 
-                printf '"%s","%s","%s/%s"\n' \
-                  "$file" \
-                  "$filename" \
-                  "$BASE_URL" \
-                  "$encoded_path"
-              done >> github-images.csv
+            encoded_path="$(python3 -c \
+              'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' \
+              "$file")"
+
+            printf '"%s","%s","%s/%s"\n' \
+              "$file" \
+              "$filename" \
+              "$BASE_URL" \
+              "$encoded_path"
+          done >> github-images.csv
+
+          echo "CSV created successfully."
+          cat github-images.csv
 
       - name: Upload CSV
         uses: actions/upload-artifact@v4
         with:
           name: github-image-list
           path: github-images.csv
+          if-no-files-found: error
