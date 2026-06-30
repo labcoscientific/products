@@ -18,7 +18,7 @@ jobs:
 
           printf '"File Path","Filename","Image URL"\n' > github-images.csv
 
-          find products -type f \
+          find products/images -type f \
             \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" -o -iname "*.gif" \) \
             | sort \
             | while IFS= read -r file; do
